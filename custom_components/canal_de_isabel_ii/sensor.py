@@ -26,6 +26,7 @@ from homeassistant.components.recorder.statistics import (
     async_import_statistics,
     get_last_statistics,
 )
+from homeassistant.components.recorder import get_instance
 from homeassistant.util import dt as dt_util
 
 async def async_setup_entry(
@@ -104,17 +105,65 @@ class CanalIsabelIIConsumptionSensor(CoordinatorEntity, SensorEntity):
 
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        self._import_historical_statistics()
+        # Process historical statistics in the background
+        self.hass.async_create_task(self._import_historical_statistics())
         super()._handle_coordinator_update()
 
-    def _import_historical_statistics(self) -> None:
+    async def _import_historical_statistics(self) -> None:
         """Import historical statistics from CSV."""
+        from homeassistant.components.recorder.statistics import (
+            async_import_statistics,
+            statistics_during_period,
+        )
+        from datetime import datetime
+        
         rows = self._get_sorted_rows()
         if not rows:
             return
 
         statistic_id = self.entity_id
         
+        # Prepare valid rows first
+        valid_rows = []
+        timestamps = []
+        for row in rows:
+            try:
+                date_str = row.get("Fecha/Hora")
+                dt_val = datetime.strptime(date_str, "%d/%m/%Y %H")
+                dt_utc = dt_val.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE).astimezone(dt_util.UTC)
+                val = float(row.get("Consumo (litros)", 0))
+                valid_rows.append((dt_utc, val))
+                timestamps.append(dt_utc)
+            except ValueError:
+                continue
+
+        if not valid_rows:
+            return
+
+        start_time = timestamps[0]
+        end_time = timestamps[-1] 
+        
+        existing_stats = await get_instance(self.hass).async_add_executor_job(
+            statistics_during_period,
+            self.hass,
+            start_time,
+            end_time,
+            [statistic_id],
+            "hour",
+            None,
+            {"mean"},
+        )
+        
+        existing_timestamps = set()
+        if existing_stats and statistic_id in existing_stats:
+            for stat in existing_stats[statistic_id]:
+                t = stat.get("start")
+                if t:
+                    if isinstance(t, (float, int)):
+                         existing_timestamps.add(dt_util.utc_from_timestamp(t))
+                    else:
+                         existing_timestamps.add(dt_util.as_utc(t))
+
         metadata = StatisticMetaData(
             has_mean=True,
             has_sum=False,
@@ -128,32 +177,22 @@ class CanalIsabelIIConsumptionSensor(CoordinatorEntity, SensorEntity):
 
         statistics = []
         
-        from datetime import datetime
-        from homeassistant.util import dt as dt_util
-        
-        for row in rows:
-            try:
-                date_str = row.get("Fecha/Hora")
-                try:
-                    dt_val = datetime.strptime(date_str, "%d/%m/%Y %H")
-                    dt_utc = dt_val.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE).astimezone(dt_util.UTC)
-                except ValueError:
-                    continue
-
-                daily_val = float(row.get("Consumo (litros)", 0))
-                
-                statistics.append(
-                    StatisticData(
-                        start=dt_utc,
-                        state=daily_val, 
-                        mean=daily_val,
-                    )
-                )
-            except ValueError:
+        for dt_utc, val in valid_rows:
+            # If we already have a stat for this timestamp, skip
+            if dt_utc in existing_timestamps:
                 continue
+                
+            statistics.append(
+                StatisticData(
+                    start=dt_utc,
+                    state=val, 
+                    mean=val,
+                )
+            )
 
         if statistics:
-             async_import_statistics(self.hass, metadata, statistics)
+             _LOGGER.debug(f"Importing {len(statistics)} new historical stats for {statistic_id}")
+             await get_instance(self.hass).async_add_executor_job(async_import_statistics, self.hass, metadata, statistics)
 
     def _get_sorted_rows(self) -> List[Dict[str, Any]]:
         """Get rows sorted by date ascending."""
@@ -219,7 +258,7 @@ class CanalIsabelIITotalConsumptionSensor(CoordinatorEntity, SensorEntity):
 
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        self._import_historical_statistics()
+        self.hass.async_create_task(self._import_historical_statistics())
         super()._handle_coordinator_update()
 
     @property
@@ -255,7 +294,7 @@ class CanalIsabelIITotalConsumptionSensor(CoordinatorEntity, SensorEntity):
         valid_rows.sort(key=parse_date)
         return valid_rows
 
-    def _import_historical_statistics(self) -> None:
+    async def _import_historical_statistics(self) -> None:
         """Import historical statistics from CSV."""
         rows = self._get_sorted_rows()
         if not rows:
@@ -313,6 +352,6 @@ class CanalIsabelIITotalConsumptionSensor(CoordinatorEntity, SensorEntity):
 
         if statistics:
             _LOGGER.debug(f"Importing {len(statistics)} statistics for {statistic_id}. Last stat: {statistics[-1]}")
-            async_import_statistics(self.hass, metadata, statistics)
+            await get_instance(self.hass).async_add_executor_job(async_import_statistics, self.hass, metadata, statistics)
         else:
              _LOGGER.debug("No valid statistics generated despite having rows.")
