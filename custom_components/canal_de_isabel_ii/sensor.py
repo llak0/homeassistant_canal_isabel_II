@@ -35,7 +35,8 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the sensor platform."""
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    data = hass.data[DOMAIN][entry.entry_id]
+    coordinator = data["coordinator"]
     
     if not coordinator.data:
         _LOGGER.warning("No data received from Canal de Isabel II, cannot create sensors yet.")
