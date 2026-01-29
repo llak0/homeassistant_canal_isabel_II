@@ -47,13 +47,14 @@ class CanalIsabelIIAPI:
             _LOGGER.error("Error checking auth: %s", e)
             return False
 
-    def keep_alive(self) -> None:
+    def keep_alive(self) -> bool:
         """Ping the server to keep the session alive."""
         try:
             _LOGGER.debug("Sending keep-alive ping...")
-            self.check_auth()
+            return self.check_auth()
         except Exception as e:
             _LOGGER.error("Error sending keep-alive ping: %s", e)
+            return False
 
     def get_consumption_data(self) -> List[Dict]:
         """Fetch and parse consumption CSV data."""

@@ -49,9 +49,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "remove_keep_alive": None
     }
 
-    # Helper to run keep_alive in executor
     async def run_keep_alive(now):
-        await hass.async_add_executor_job(api.keep_alive)
+        """Keep the session alive and handle expiration."""
+        success = await hass.async_add_executor_job(api.keep_alive)
+        if not success:
+            _LOGGER.warning("Session expired or keep-alive failed. Triggering re-authentication flow.")
+            await coordinator.async_request_refresh()
 
     # Schedule keep-alive every 15 minutes
     remove_keep_alive = async_track_time_interval(
