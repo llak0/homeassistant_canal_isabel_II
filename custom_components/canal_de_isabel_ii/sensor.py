@@ -146,7 +146,7 @@ class CanalIsabelIIConsumptionSensor(CoordinatorEntity, SensorEntity):
             [statistic_id],
             "hour",
             None,
-            {"mean"},
+            {"state"},
         )
         
         existing_timestamps = set()
@@ -160,13 +160,12 @@ class CanalIsabelIIConsumptionSensor(CoordinatorEntity, SensorEntity):
                          existing_timestamps.add(dt_util.as_utc(t))
 
         metadata = StatisticMetaData(
-            has_mean=True,
             has_sum=False,
             name=self.name,
             source='recorder',
             statistic_id=statistic_id,
             unit_of_measurement=UnitOfVolume.LITERS,
-            mean_type=StatisticMeanType.ARITHMETIC,
+            mean_type=StatisticMeanType.NONE,
             unit_class=VolumeConverter.UNIT_CLASS,
         )
 
@@ -180,8 +179,7 @@ class CanalIsabelIIConsumptionSensor(CoordinatorEntity, SensorEntity):
             statistics.append(
                 StatisticData(
                     start=dt_utc,
-                    state=val, 
-                    mean=val,
+                    state=val,
                 )
             )
 
@@ -290,7 +288,6 @@ class CanalIsabelIITotalConsumptionSensor(CoordinatorEntity, SensorEntity):
         _LOGGER.debug(f"Starting historical import for {statistic_id}. Total rows: {len(rows)}")
 
         metadata = StatisticMetaData(
-            has_mean=False,
             has_sum=True,
             name=self.name,
             source='recorder',
