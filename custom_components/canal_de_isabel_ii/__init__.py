@@ -58,7 +58,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Schedule keep-alive every 15 minutes
     remove_keep_alive = async_track_time_interval(
-        hass, run_keep_alive, timedelta(minutes=15)
+        hass, run_keep_alive, timedelta(minutes=4)
     )
     hass.data[DOMAIN][entry.entry_id]["remove_keep_alive"] = remove_keep_alive
     
