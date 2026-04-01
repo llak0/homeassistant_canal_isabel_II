@@ -77,7 +77,12 @@ class CanalIsabelIIConsumptionSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def native_value(self) -> Optional[float]:
-        """Return the state of the sensor (latest daily consumption)."""
+        latest_row = self._get_latest_row()
+        if latest_row:
+            try:
+                return float(latest_row.get("Consumo (litros)", 0))
+            except (ValueError, TypeError):
+                return None
         return None
 
     @property
@@ -256,8 +261,13 @@ class CanalIsabelIITotalConsumptionSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def native_value(self) -> Optional[float]:
-        """Return the Cumulative Total."""
-        return None
+        rows = self._get_sorted_rows()
+        if not rows:
+            return None
+        try:
+            return sum(float(r.get("Consumo (litros)", 0)) for r in rows)
+        except (ValueError, TypeError):
+            return None
 
     def _get_sorted_rows(self) -> List[Dict[str, Any]]:
         """Get rows sorted by date ascending."""
