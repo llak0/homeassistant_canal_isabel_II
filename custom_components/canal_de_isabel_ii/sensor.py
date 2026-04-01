@@ -165,10 +165,10 @@ class CanalIsabelIIConsumptionSensor(CoordinatorEntity, SensorEntity):
                          existing_timestamps.add(dt_util.as_utc(t))
 
         metadata = StatisticMetaData(
-            has_sum=False,
-            name=self.name,
-            source='recorder',
-            statistic_id=statistic_id,
+            source="canal_de_isabel_ii",           # must match the integration domain
+            statistic_id="canal_de_isabel_ii:consumption_296962365",  # namespaced id
+            has_sum=True,
+            name="Canal de Isabel II Consumption 296962365",
             unit_of_measurement=UnitOfVolume.LITERS,
             mean_type=StatisticMeanType.NONE,
             unit_class=VolumeConverter.UNIT_CLASS,
